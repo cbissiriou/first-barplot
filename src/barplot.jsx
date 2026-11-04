@@ -1,49 +1,63 @@
 import * as d3 from "d3";
 import { useRef, useState } from "react";
 
-const WIDTH = 500;
+const WIDTH = 600;
 const HEIGHT = 400;
 const MARGIN = { top: 20, right: 40, bottom: 30, left: 90 };
 
 const defaultData = [
-  { country: "United States", students: 68 },
-  { country: "France", students: 21 },
-  { country: "United Kingdom", students: 21 },
-  { country: "Germany", students: 20 },
-  { country: "Switzerland", students: 13 },
-  { country: "Spain", students: 10 },
-  { country: "Netherlands", students: 9 },
-  { country: "India", students: 9 },
-  { country: "Singapore", students: 8 },
-  { country: "Ireland", students: 8 },
-  { country: "Sweden", students: 7 },
-  { country: "Australia", students: 7 },
-  { country: "Canada", students: 6 },
-  { country: "Finland", students: 5 },
-  { country: "Mexico", students: 4 },
-  { country: "Brazil", students: 4 },
-  { country: "Saudi Arabia", students: 3 },
-  { country: "Romania", students: 3 },
-  { country: "Philippines", students: 3 },
-  { country: "New Zealand", students: 3 },
+  { country: "United States",region: "North America", students: 68 },
+  { country: "France",region: "Europe", students: 21 },
+  { country: "United Kingdom",region: "Europe", students: 21 },
+  { country: "Germany",region: "Europe", students: 20 },
+  { country: "Switzerland",region: "Europe", students: 13 },
+  { country: "Spain",region: "Europe", students: 10 },
+  { country: "Netherlands",region: "Europe", students: 9 },
+  { country: "India",region: "Asia", students: 9 },
+  { country: "Singapore",region: "Asia", students: 8 },
+  { country: "Ireland",region: "Europe", students: 8 },
+  { country: "Sweden",region: "Europe", students: 7 },
+  { country: "Australia",region: "Oceania", students: 7 },
+  { country: "Canada",region: "North America", students: 6 },
+  { country: "Finland",region: "Europe", students: 5 },
+  { country: "Mexico",region: "North America", students: 4 },
+  { country: "Brazil",region: "South America", students: 4 },
+  { country: "Saudi Arabia",region: "Asia", students: 3 },
+  { country: "Romania",region: "Europe", students: 3 },
+  { country: "Philippines",region: "Asia", students: 3 },
+  { country: "New Zealand",region: "Oceania", students: 3 },
+  { country: "Morocco",region: "Africa", students: 7 },
+  { country: "South Africa",region: "Africa", students: 10 },
 ];
+const PALETTE = ["#2a6f97", "#c4693d", "#4c956c", "#8e5ea2", "#b8a33a", "#7a7a7a"];
 
 export default function Barplot({ data = defaultData } = {}) {
 
     const innerWidth = WIDTH - MARGIN.left - MARGIN.right;
     const innerHeight = HEIGHT - MARGIN.top - MARGIN.bottom;
 
+    // Regions, color per region, and the active filter
+    const regions = [...new Set(data.map((d) => d.region))].sort();
+    const colorOf = (r) => PALETTE[regions.indexOf(r) % PALETTE.length];
+    const [selectedRegion, setSelectedRegion] = useState("All");
+
+    
+  // Grouped by region (alphabetical), then by students desc inside each group
+    const visibleData = data
+        .filter((d) => selectedRegion === "All" || d.region === selectedRegion)
+        .sort((a, b) => a.region.localeCompare(b.region) || b.students - a.students);
+
     // Y axis: one band per country
     const yScale = d3
         .scaleBand()
-        .domain(data.map((d) => d.country))
+        .domain(visibleData.map((d) => d.country))
         .range([0, innerHeight])
         .padding(0.2);
     
     // X axis: number of students
     const xScale = d3
         .scaleLinear()
-        .domain([0, d3.max(data, (d) => d.students) ?? 0])
+        .domain([0, d3.max(visibleData, (d) => d.students) ?? 0])
         .nice()
         .range([0, innerWidth]);
     
@@ -61,6 +75,47 @@ export default function Barplot({ data = defaultData } = {}) {
 
 
     return (
+        <div style={{ width: WIDTH }}>
+        <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginBottom: 8 }}>
+            {["All", ...regions].map((r) => {
+            const active = selectedRegion === r;
+            return (
+                <button
+                key={r}
+                type="button"
+                aria-pressed={active}
+                onClick={() => {
+                    setSelectedRegion(r);
+                    setHover(null);
+                }}
+                style={{
+                    display: "inline-flex",
+                    alignItems: "center",
+                    gap: 6,
+                    padding: "4px 10px",
+                    fontSize: 12,
+                    cursor: "pointer",
+                    borderRadius: 14,
+                    border: `1px solid ${active ? "#222" : "#ccc"}`,
+                    background: active ? "#222" : "#fff",
+                    color: active ? "#fff" : "#222",
+                }}
+                >
+                {r !== "All" && (
+                    <span
+                    style={{
+                        width: 8,
+                        height: 8,
+                        borderRadius: "50%",
+                        background: colorOf(r),
+                    }}
+                    />
+                )}
+                {r}
+                </button>
+            );
+            })}
+        </div>
         <svg
             ref={svgRef}
             width={WIDTH}
@@ -81,7 +136,7 @@ export default function Barplot({ data = defaultData } = {}) {
                 ))}
     
                 {/* Bars + labels */}
-                {data.map((d) => {
+                {visibleData.map((d) => {
                 const y = yScale(d.country);
                 const barWidth = xScale(d.students);
                 return (
@@ -91,7 +146,7 @@ export default function Barplot({ data = defaultData } = {}) {
                             y={y}
                             width={barWidth}
                             height={yScale.bandwidth()}
-                            fill="#2a6f97"
+                            fill={colorOf(d.region)}
                             opacity={hover && hover.d.country !== d.country ? 0.5 : 1}
                             onMouseEnter={(e) => handleMove(e, d)}
                             onMouseMove={(e) => handleMove(e, d)}
@@ -129,22 +184,26 @@ export default function Barplot({ data = defaultData } = {}) {
                 <g
                 transform={`translate(${
                     hover.x + 12 + 150 > WIDTH ? hover.x - 162 : hover.x + 12
-                },${Math.max(hover.y - 58, 0)})`}
+                },${Math.max(hover.y - 72, 0)})`}
                 pointerEvents="none"
                 >
-                <rect width={150} height={52} rx={4} fill="#fff" stroke="#999" />
+                <rect width={150} height={66} rx={4} fill="#fff" stroke="#999" />
                 <text x={8} y={18} fontSize={12} fontWeight="bold" fill="#222">
                     {hover.d.country}
                 </text>
-                <text x={8} y={32} fontSize={11} fill="#444">
+                 <text x={8} y={32} fontSize={11} fill={colorOf(hover.d.region)}>
+                    {hover.d.region}
+                </text>
+                <text x={8} y={46} fontSize={11} fill="#444">
                     {hover.d.students} students
                 </text>
-                <text x={8} y={45} fontSize={11} fill="#444">
+                <text x={8} y={59} fontSize={11} fill="#444">
                     {total > 0 ? ((hover.d.students / total) * 100).toFixed(1) : "0.0"}% of total
                 </text>
                 </g>
             )}
         </svg>
+        </div>
 
     );
 };
